@@ -10701,10 +10701,6 @@ function renderMd(raw){
     return '\x00D'+(media_stash.length-1)+'\x00'+parts[1];
   });
   // ── End MEDIA stash ─────────────────────────────────────────────────────────
-  // Pre-pass: decode HTML entities first so markdown processing works correctly.
-  // This prevents double-escaping when LLM outputs entities like &lt; &gt; &amp;
-  const decode=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
-  s=decode(s);
   // Pre-pass: convert safe inline HTML tags the model may emit into their
   // markdown equivalents so the pipeline can render them correctly.
   // Only runs OUTSIDE fenced code blocks and backtick spans (stash + restore).

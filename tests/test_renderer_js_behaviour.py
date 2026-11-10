@@ -900,6 +900,56 @@ class TestBlockquoteEntityEncodedInput:
         assert "<pre>" in out, f"Fenced code inside entity-encoded blockquote must render: {out!r}"
 
 
+class TestEntityDecodeRunsOnce:
+    """Entities must be decoded exactly once (flyover defect: double decode).
+
+    renderMd() decoded ``&lt; &gt; &amp; &quot; &#39;`` at the top of the
+    function and then decoded the same five sequences again after the MEDIA
+    stash.  The second pass re-decoded text the first had already turned into
+    entities: ``&amp;lt;`` became ``&lt;`` and then a literal ``<`` in the
+    returned HTML, so escaped markup written by the model was parsed as real
+    markup (``&amp;lt;div&amp;gt;`` produced an empty ``<div>`` element and
+    ``&amp;lt;script&amp;gt;…`` lost its tags entirely).
+
+    The surviving decode must stay where it is — before the blockquote
+    pre-pass — because ``&gt;`` lines have to become ``>`` for blockquote
+    detection (see TestBlockquoteEntityEncodedInput).
+    """
+
+    def test_double_encoded_lt_renders_as_entity_not_raw_lt(self, driver_path):
+        out = _render(driver_path, "&amp;lt;")
+        assert "&lt;" in out, (
+            f"`&amp;lt;` must decode once to the entity `&lt;`, not twice to `<`: {out!r}"
+        )
+        assert "<p><" not in out, f"raw `<` leaked into the markup: {out!r}"
+
+    def test_double_encoded_tag_is_text_not_an_element(self, driver_path):
+        out = _render(driver_path, "&amp;lt;div&amp;gt;label&amp;lt;/div&amp;gt;")
+        assert "&lt;div&gt;label&lt;/div&gt;" in out, (
+            f"escaped tag text must survive as text: {out!r}"
+        )
+        assert "<div>" not in out, f"escaped tag became a real element: {out!r}"
+
+    def test_double_encoded_script_text_is_preserved(self, driver_path):
+        out = _render(driver_path, "&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;")
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in out, (
+            f"escaped script text must be rendered as text: {out!r}"
+        )
+        assert "<script>" not in out, f"escaped script became a real tag: {out!r}"
+
+    def test_single_encoded_ampersand_still_renders_as_ampersand(self, driver_path):
+        out = _render(driver_path, "Tom &amp; Jerry")
+        assert "Tom & Jerry" in out, f"`&amp;` must still render as `&`: {out!r}"
+        assert "&amp;amp;" not in out, f"`&amp;` was double-escaped: {out!r}"
+
+    def test_double_encoded_ampersand_decodes_exactly_once(self, driver_path):
+        out = _render(driver_path, "&amp;amp;")
+        assert "&amp;" in out, (
+            f"`&amp;amp;` must decode once to `&amp;`, not twice to `&`: {out!r}"
+        )
+        assert "<p>&</p>" not in out, f"`&amp;amp;` decoded twice: {out!r}"
+
+
 class TestMermaidToolOutputGuard:
     """Line-numbered tool excerpts must not be auto-rendered as Mermaid."""
 
